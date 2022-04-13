@@ -1,0 +1,11 @@
+spring:
+    application:
+        name: "multiauth"
+        
+mongo:
+    databaseName: WebfluxUserData
+    basePackage: org.github.webflux.auth.multipleauth.entities
+    
+jwt:
+    expiry: 300000
+    secret: aGVsbG93b3JsZA==

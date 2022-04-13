@@ -7,6 +7,7 @@ import org.github.webflux.auth.multipleauth.exception.UnAuthorizedUserException;
 import org.github.webflux.auth.multipleauth.modals.auth.ValidToken;
 import org.github.webflux.auth.multipleauth.security.CustomUserDetail;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import io.jsonwebtoken.Claims;
@@ -30,40 +31,41 @@ public class TokenService {
     }
     
     
-    public String generateToken(CustomUserDetail principal) {
+    public Mono<String> generateToken(Authentication authentication) {
         
+        CustomUserDetail principal = (CustomUserDetail)authentication.getPrincipal();
         Date issuedAt = new Date();
         Date Expiry = new Date(issuedAt.getTime() + JWTExpiry);
         
-        return Jwts.builder()
+        return Mono.justOrEmpty(Jwts.builder()
         .setIssuer(principal.getUsername())
         .setSubject(principal.getId())
         .setExpiration(Expiry)
         .setIssuedAt(issuedAt)
         .signWith(SignatureAlgorithm.HS512, Base64.getDecoder().decode(JWTSecret.getBytes()))
-        .compact();
+        .compact());
         
         
     }
     
-  public Mono<ValidToken> validate(String token){
+  public Mono<CustomUserDetail> validate(String token){
       
-      return Mono.just(getToken(token))
+      return Mono.fromSupplier(() -> getToken(token)) // don't use just the gettoken exception is captured by on assembly of mono and on errorresume does not run
               .onErrorResume((Error) -> Mono.error(new UnAuthorizedUserException(Error.getMessage())) );
   }
   
   
-  public ValidToken getToken(String token) {
+  public CustomUserDetail getToken(String token) {
       
       Claims claims = Jwts.parser().setSigningKey(Base64.getDecoder().decode(JWTSecret.getBytes()))
       .parseClaimsJws(token)
       .getBody();
       
       if(claims.getExpiration().before(new Date())){
-          throw new ExpiredJwtException(null, claims, "token is expired");
+          throw new RuntimeException("token is expired");
       }
       
-      return new ValidToken(claims.getSubject(), claims.getIssuer());
+      return new CustomUserDetail(claims.getSubject(), null, claims.getIssuer(), null);
       
       
       
